@@ -1,0 +1,25 @@
+module cruiseControl:
+
+
+function saturateThrottle(float, bool): float;
+function regulateThrottle(bool, float, float): float;
+
+%interface declarations
+input on, off, resume, set, quickDeccel, quickAccel : bool;
+input accel, break, speed := 0: float;
+output cruiseSpeed, throttleCmd := 0: float;
+output cruiseState := 0: integer;
+output count: integer;
+
+[
+%thread emitting the current count value
+loop
+	pause;
+	emit count(outCount());
+end loop
+]
+
+
+end module
+
+
