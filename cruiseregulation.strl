@@ -1,13 +1,14 @@
 module cruiseControl:
 
 
-function saturateThrottle(float, bool): float;
-function regulateThrottle(bool, float, float): float;
+function saturateThrottle(float, boolean): float;
+function regulateThrottle(boolean, float, float): float;
+function outCount() : integer;
 
 %interface declarations
-input on, off, resume, set, quickDeccel, quickAccel : bool;
-input accel, break, speed := 0: float;
-output cruiseSpeed, throttleCmd := 0: float;
+input on, off, resume, set, quickDeccel, quickAccel : boolean;
+input accel, break, speed : float;
+output cruiseSpeed, throttleCmd : float;
 output cruiseState := 0: integer;
 output count: integer;
 
