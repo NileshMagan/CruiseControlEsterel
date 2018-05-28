@@ -10,16 +10,113 @@ input on, off, resume, set, quickDeccel, quickAccel : boolean;
 input accel, break, speed : float;
 output cruiseSpeed, throttleCmd : float;
 output cruiseState := 0: integer;
+
+% OTHER OUTPUTS
 output count: integer;
 
-[
-%thread emitting the current count value
-loop
-	pause;
-	emit count(outCount());
-end loop
-]
 
+% CONSTANTS
+constant speedMin  := 30  : float;
+constant speedMax  := 150 : float;
+constant speedInc  := 2.5 : float;
+constant pedalsMin := 3   : float;
+
+% TODO: cruiseEnable
+% TODO brkaePressed signal
+
+% TODO double check curiseEnable
+$ TODO may need to pre(brakePressed)
+
+
+var state := 0 : integer in
+	[
+	loop
+		trap T1 in
+			pause; 		% TICK DEPENDANT 
+			if (state = 0) then 			% OFF
+				      
+			      	%%%% OUTPUT LOGIC
+				emit cruiseState(0);
+				
+				%%%% NEXT STATE LOGIC
+				if (on) then
+					state := 1;
+				end if;
+				
+				
+				exit T1;
+			end if;
+			
+			if (state = 1) then			% ON
+			
+				%%%% OUTPUT LOGIC
+				emit cruiseState(1);
+			
+				%%%% NEXT STATE LOGIC
+				if (off) then
+					state := 0;
+					exit T1;
+				end if;
+				if (brakePressed) then
+					state := 3;
+					exit T1;
+				end if;
+				if (not(cruiseEnable)) then
+					state := 2;
+					exit T1;
+				end if;
+				
+				
+				
+				exit T1;
+			end if;
+			
+			if (state = 2) then			% DISABLE
+			
+				%%%% OUTPUT LOGIC
+				emit cruiseState(2);
+			
+				%%%% NEXT STATE LOGIC
+				if (off) then
+					state := 0;
+					exit T1;
+				end if;
+				if (cruiseEnable) then
+					state := 1;
+					exit T1;
+				end if;
+				
+				
+				exit T1;
+			end if;
+			
+			if (state = 3) then			% STDBY
+			
+				%%%% OUTPUT LOGIC
+				emit cruiseState(3);
+			
+				%%%% NEXT STATE LOGIC
+				if (off) then
+					state := 0;
+					exit T1;
+				end if;
+				if (resume and cruiseEnable) then
+					state := 1;
+					exit T1;
+				end if;
+				if (resume and not(cruiseEnable)) then
+					state := 2;
+					exit T1;
+				end if;
+				
+				
+				
+				exit T1;
+			end if;
+		end trap
+	end loop
+	]	
+end var
 
 end module
 
