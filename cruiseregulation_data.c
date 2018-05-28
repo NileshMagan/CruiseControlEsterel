@@ -16,7 +16,7 @@ PARAMETERS: throttleIn - throttle input
             saturate - true if saturated, false otherwise
 RETURNS: throttle output (ThrottleCmd)
 */
-float saturateThrottle(float throttleIn, boolean saturate)
+float saturateThrottle(float throttleIn, boolean *saturate)
 {
 	static const float THROTTLESATMAX = 45.0;
 	if (throttleIn > THROTTLESATMAX) {

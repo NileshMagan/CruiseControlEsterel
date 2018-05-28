@@ -1,3 +1,5 @@
 *.blif
 *.ctbl
 *.xev
+cruiseregulation.c
+*.o
