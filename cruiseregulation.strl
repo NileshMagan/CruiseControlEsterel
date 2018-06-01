@@ -1,18 +1,17 @@
 module cruiseControl:
 
 
-function saturateThrottle(float, boolean): float;
 function regulateThrottle(boolean, float, float): float;
 
 %interface declarations
-input on, off, resume, set, quickDeccel, quickAccel : boolean;
+input on, off, resume, set, quickDeccel, quickAccel;
 input accel : float;
 input brake : float;
 input speed : float;
 
 output cruiseSpeed : float;
 output throttleCmd : float;
-output cruiseState := 0: integer;
+output cruiseState := 1: integer;
 
 % CONSTANTS
 constant speedMin  = 30.0f   : float;
@@ -28,32 +27,26 @@ constant pedalsMin = 3.0f    : float;
 
 signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in 
 	[
-	var state := 0 : integer in
+	var state := 1 : integer in
 		loop
 			trap T1 in
 				pause; 		% TICK DEPENDANT 
-				if (state = 0) then 			% OFF
-					      
-				      	%%%% OUTPUT LOGIC
-					emit cruiseState(0);
+				if (state = 1) then 			% OFF
 				
 					%%%% NEXT STATE LOGIC
 					present on then
-						state := 1;
+						state := 2;
 					end present;
 				
 				
 					exit T1;
 				end if;
 			
-				if (state = 1) then			% ON
-			
-					%%%% OUTPUT LOGIC
-					emit cruiseState(1);
+				if (state = 2) then			% ON
 			
 					%%%% NEXT STATE LOGIC
 					present off then
-						state := 0;
+						state := 1;
 						exit T1;
 					end present;
 					present brakePressed then
@@ -61,7 +54,7 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 						exit T1;
 					end present;
 					 present not(cruiseEnable) then
-						state := 2;
+						state := 4;
 						exit T1;
 					end present;
 				
@@ -70,18 +63,15 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 					exit T1;
 				end if;
 			
-				if (state = 2) then			% DISABLE
-			
-					%%%% OUTPUT LOGIC
-					emit cruiseState(2);
+				if (state = 4) then			% DISABLE
 			
 					%%%% NEXT STATE LOGIC
 					present off then
-						state := 0;
+						state := 1;
 						exit T1;
 					end present;
 					present cruiseEnable then
-						state := 1;
+						state := 2;
 						exit T1;
 					end present;
 				
@@ -91,27 +81,27 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 			
 				if (state = 3) then			% STDBY
 			
-					%%%% OUTPUT LOGIC
-					emit cruiseState(3);
-			
 					%%%% NEXT STATE LOGIC
 					present off then
-						state := 0;
+						state := 1;
 						exit T1;
 					end present;
 					
 					present resume and cruiseEnable then
-						state := 1;
+						state := 2; 
 						exit T1;
 					end present;
 					present resume and not(cruiseEnable) then
-						state := 2;
+						state := 4;
 						exit T1;				
 					end present;
 					
 					exit T1;
 				end if;
-			end trap
+			end trap;
+			
+			%%%% OUTPUT LOGIC
+			emit cruiseState(state);
 		end loop		
 	end var
 	]
@@ -155,7 +145,7 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 	[ %%%%%%%% CALC CRUISE ENABLE
 		loop 
 			%TODO, may need a pre here
-			present accelPressed and withinSpeedLimit then 
+			present (not accelPressed) and withinSpeedLimit then 
 				emit cruiseEnable;
 			end present;
 			pause
@@ -168,17 +158,19 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 			% TODO: Likely need a pre here too
 			present (on or set) and withinSpeedLimit then 
 				emit cruiseSpeed(?speed) 
+			else
+				emit cruiseSpeed(0.0f);
 			end present; 
 		
 			present quickAccel then 
 				if ((?speed + speedInc) < speedMax) then 
-					emit speed(?speed + speedInc)
+					emit speed(?speed + speedInc);
 				end if;
 			end present; 
 
 			present quickDeccel then 
 				if ((?speed - speedInc) > speedMin) then 
-					emit speed(?speed - speedInc)
+					emit speed(?speed - speedInc);
 				end if;
 			end present;
 			%TODO: pause what we want here?
@@ -186,19 +178,25 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 		end loop
 	]
 	
-||
-
-	[ %%%%%%%% DRIVING CONTROL	
-		loop 
-			present (not(pre(on)) and on) then 
-				saturateThrottle(throttleCmd, true);
-	%TODO: possibly dont need this 	regulateThrottle(true, ?cruiseSpeed, ?speed)
-			end present; 
-	
-			regulateThrottle(false, ?cruiseSpeed, ?speed);
-			pause
-		end loop 
-	]
+%||
+%
+%	[ %%%%%%%% DRIVING CONTROL
+%		var currentThrottle := 0 : float in	
+%			loop 
+%				% TODO: may need pre here
+%				present (not off) then
+%					present (on) then 
+%						if (pre(not on)) then
+%							regulateThrottle(true, ?cruiseSpeed, ?speed);
+%						else
+%							regulateThrottle(false, ?cruiseSpeed, ?speed);
+%						end if;
+%					end present; 	
+%				end present;
+%				pause 
+%			end loop 
+%		end var
+%	]
 	
 
 	

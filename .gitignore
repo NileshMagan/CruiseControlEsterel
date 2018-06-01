@@ -3,3 +3,4 @@
 *.xev
 cruiseregulation.c
 *.o
+*.exe
