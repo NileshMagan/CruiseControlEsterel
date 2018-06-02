@@ -1,14 +1,8 @@
 
-% TODO: cruiseEnable
-% TODO brakePressed signal
+% This module enulates the Finite State Machine used to control the system outputs
 
-% TODO double check cruiseEnable
-% TODO may need to pre(brakePressed)
-% TODO check if defaulting inputs to 0 is bad
 module FSM:
 function regulateThrottle(boolean, float, float): float;
-
-	%Interface declarations
 	input on, off, resume, set;
 	input brakePressed;
 	input accelPressed;
@@ -17,16 +11,15 @@ function regulateThrottle(boolean, float, float): float;
 	input speed : float;
 	input accel : float;
 	input cruiseSpeed : float;
-
 	output throttleCmd : float;
 	output cruiseState : string; 
 
 		var prevState := 1 : integer, state := 1 : integer in
 			loop
 				trap T1 in
-					pause; 		% TICK DEPENDANT 
+					pause; 
 
-					if (state = 1) then 			% OFF
+					if (state = 1) then 			% OFF STATE
 						%%%% NEXT STATE LOGIC
 
 						present on and brakePressed then
@@ -47,7 +40,7 @@ function regulateThrottle(boolean, float, float): float;
 						exit T1;
 					end if;
 				
-					if (state = 2) then			% ON
+					if (state = 2) then			% ON STATE
 						%%%% NEXT STATE LOGIC
 						present off then
 							state := 1;
@@ -65,7 +58,7 @@ function regulateThrottle(boolean, float, float): float;
 						exit T1;
 					end if;
 							
-					if (state = 3) then			% STDBY
+					if (state = 3) then			% STDBY STATE
 						%%%% NEXT STATE LOGIC
 						present brakePressed then % Brake has highest priprity
 							exit T1;
@@ -88,7 +81,7 @@ function regulateThrottle(boolean, float, float): float;
 						exit T1;
 					end if;
 
-					if (state = 4) then			% DISABLE
+					if (state = 4) then			% DISABLE STATE
 						%%%% NEXT STATE LOGIC
 						present off then
 							state := 1;
@@ -130,13 +123,13 @@ function regulateThrottle(boolean, float, float): float;
 end module	
 	
 
-module brakeDetection: %%%%%%%% BRAKE PRESS DETECTION
+% This module detects whether the break pedal has been pressed based on the signal value
+module brakeDetection: 
 	input brake : float;
 	output brakePressed;
 	constant pedalsMin = 3.0f : float;
 	
 		loop
-			% TODO check if this should be pre or not
 			if (?brake > pedalsMin) then
 				emit brakePressed
 			end if;
@@ -144,13 +137,12 @@ module brakeDetection: %%%%%%%% BRAKE PRESS DETECTION
 		end loop
 end module
 
-
-module accelDetection: %%%%%%%% ACCEL PRESS DETECTION
+% This module detects whether the accelerator pedal has been pressed based on the signal value
+module accelDetection: 
 	input accel : float;
 	output accelPressed;
 	constant pedalsMin = 3.0f : float;
 		loop
-			% TODO check if this should be pre or not
 			if (?accel > pedalsMin) then
 				emit accelPressed
 			end if;
@@ -158,7 +150,8 @@ module accelDetection: %%%%%%%% ACCEL PRESS DETECTION
 		end loop
 end module
 
-module speedLimitDetection: %%%%%%%% CALC WITHIN SPEED LIMIT
+% This module calculates whether the currect speed input is within the defined limits
+module speedLimitDetection: 
 	input speed : float;
 	output withinSpeedLimit;
 	constant speedMin  = 30.0f   : float;
@@ -171,12 +164,12 @@ module speedLimitDetection: %%%%%%%% CALC WITHIN SPEED LIMIT
 		end loop 
 end module
 	
-
-module cruiseEnableDetection: %%%%%%%% CALC CRUISE ENABLE
+% This module determines if the cruise should be enabled. 
+% This is based on whether the vehicle is within the speed limit and if the accelerator pedal is pressed.
+module cruiseEnableDetection: 
 	input accelPressed, withinSpeedLimit;
 	output cruiseEnable;
 		loop 
-			%TODO, may need a pre here
 			present (not accelPressed) and withinSpeedLimit then 
 				emit cruiseEnable;
 			end present;
@@ -184,8 +177,9 @@ module cruiseEnableDetection: %%%%%%%% CALC CRUISE ENABLE
 		end loop
 end module
 
-
-module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT 
+% This module determines the value of the cruise speed. 
+% The cruise speed is set when the on or set button is pressed and updated with the quickAccel and quickDecel buttons.
+module cruiseSpeedManagement: 
 	input on, set, withinSpeedLimit, accelPressed, quickAccel, quickDeccel;
 	input speed : float;
 	output cruiseSpeed : float;
@@ -227,14 +221,14 @@ module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT
 				
 				emit cruiseSpeed(pre(?cruiseSpeed));
 			end trap;
-			%TODO: pause what we want here?
 			pause;
 		end loop
-end module
-	
+end module	
 
+
+% TOP LEVEL MODULE 
+% Port mapping and running other modules in parallel
 module cruiseControl:
-	%interface declarations
 	input on, off, resume, set, quickDeccel, quickAccel;
 	input accel := 0.0f : float;
 	input brake := 0.0f : float;
