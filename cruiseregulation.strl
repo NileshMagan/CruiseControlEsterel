@@ -170,9 +170,7 @@ module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT
 		loop
 			% TODO: Likely need a pre here too
 			present (on or set) and withinSpeedLimit then 
-				emit cruiseSpeed(?speed) 
-			else
-				emit cruiseSpeed(0.0f);
+				sustain cruiseSpeed(?speed);
 			end present; 
 		
 			present quickAccel then 
@@ -214,12 +212,12 @@ end module
 module cruiseControl:
 	%interface declarations
 	input on, off, resume, set, quickDeccel, quickAccel;
-	input accel : float;
-	input brake : float;
-	input speed : float;
+	input accel := 0.0f : float;
+	input brake := 0.0f : float;
+	input speed := 0.0f : float;
 
-	output cruiseSpeed : float;
-	output throttleCmd : float;
+	output cruiseSpeed := 0.0f : float;
+	output throttleCmd := 0.0f : float;
 	output cruiseState := 1: integer;
 
 
