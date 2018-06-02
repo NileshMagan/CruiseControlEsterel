@@ -187,14 +187,24 @@ module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT
 	constant speedInc  = 2.5f    : float;
 		loop
 			trap CT in
-				present (on or set) and withinSpeedLimit then 
-					emit cruiseSpeed(?speed);
+				present (on or set) then 
+					present withinSpeedLimit then
+						emit cruiseSpeed(?speed);
+					else
+						if ?speed < speedMin then 
+							emit cruiseSpeed(speedMin);
+						elsif ?speed > speedMax then 
+							emit cruiseSpeed(speedMax);
+						end if;
+					end present;
 					exit CT;
 				end present;
 
 				present quickDeccel and (not (on or set)) then 
 					if ((pre(?cruiseSpeed) - speedInc) > speedMin) then 
 						emit cruiseSpeed(pre(?cruiseSpeed) - speedInc);
+					else
+						emit cruiseSpeed(speedMin);
 					end if;
 					exit CT;
 				end present;
@@ -202,6 +212,8 @@ module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT
 				present quickAccel and (not (on or set))  then
 					if ((pre(?cruiseSpeed) + speedInc) < speedMax) then 
 						emit cruiseSpeed(pre(?cruiseSpeed) + speedInc);
+					else
+						emit cruiseSpeed(speedMax);
 					end if;
 					exit CT;
 				end present;				
