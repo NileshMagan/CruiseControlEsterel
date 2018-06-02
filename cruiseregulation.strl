@@ -116,10 +116,10 @@ module brakeDetection: %%%%%%%% BRAKE PRESS DETECTION
 	
 		loop
 			% TODO check if this should be pre or not
-			await brake;
 			if (?brake > pedalsMin) then
 				emit brakePressed
 			end if;
+			pause;
 		end loop
 end module
 
@@ -130,10 +130,10 @@ module accelDetection: %%%%%%%% ACCEL PRESS DETECTION
 	constant pedalsMin = 3.0f : float;
 		loop
 			% TODO check if this should be pre or not
-			await accel;
 			if (?accel > pedalsMin) then
 				emit accelPressed
 			end if;
+			pause;
 		end loop
 end module
 
