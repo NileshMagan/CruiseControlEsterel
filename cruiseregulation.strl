@@ -193,15 +193,15 @@ module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT
 				end present;
 
 				present quickDeccel and (not (on or set)) then 
-					if ((?cruiseSpeed - speedInc) > speedMin) then 
-						emit cruiseSpeed(?cruiseSpeed - speedInc);
+					if ((pre(?cruiseSpeed) - speedInc) > speedMin) then 
+						emit cruiseSpeed(pre(?cruiseSpeed) - speedInc);
 					end if;
 					exit CT;
 				end present;
 
 				present quickAccel and (not (on or set))  then
-					if ((?cruiseSpeed + speedInc) < speedMax) then 
-						emit cruiseSpeed(?cruiseSpeed + speedInc);
+					if ((pre(?cruiseSpeed) + speedInc) < speedMax) then 
+						emit cruiseSpeed(pre(?cruiseSpeed) + speedInc);
 					end if;
 					exit CT;
 				end present;				
