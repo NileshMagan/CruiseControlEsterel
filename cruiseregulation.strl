@@ -53,6 +53,10 @@ function regulateThrottle(boolean, float, float): float;
 							
 					if (state = 3) then			% STDBY
 						%%%% NEXT STATE LOGIC
+						present brakePressed then % Brake has highest priprity
+							exit T1;
+						end present;
+
 						present off then
 							state := 1;
 							exit T1;
