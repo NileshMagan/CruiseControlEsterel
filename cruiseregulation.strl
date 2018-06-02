@@ -8,19 +8,18 @@
 module FSM:
 function regulateThrottle(boolean, float, float): float;
 
-
-
-
 	%Interface declarations
 	input on, off, resume, set;
-	input speed : float;
 	input brakePressed;
 	input cruiseEnable;
+	input speed : float;
+	input accel : float;
+	input cruiseSpeed : float;
 
 	output throttleCmd : float;
 	output cruiseState : integer; 
 
-		var state := 1 : integer in
+		var prevState := 1 : integer, state := 1 : integer in
 			loop
 				trap T1 in
 					pause; 		% TICK DEPENDANT 
@@ -89,6 +88,18 @@ function regulateThrottle(boolean, float, float): float;
 				
 				%%%% OUTPUT LOGIC
 				emit cruiseState(state);
+				if (state = 2) then
+					if (prevState = 2) then
+						emit throttleCmd(regulateThrottle(false, ?cruiseSpeed, ?speed));
+					else
+						emit throttleCmd(regulateThrottle(true, ?cruiseSpeed, ?speed));
+					end if;
+				else % If not in ON state, throttleCmd <= accel
+					emit throttleCmd(?accel);
+				end if;
+
+				prevState := state;
+
 			end loop		
 		end var
 end module	
@@ -217,9 +228,11 @@ module cruiseControl:
 			signal on/on;
 			signal off/off;
 			signal resume/resume;
-			signal speed/speed;
 			signal brakePressed/brakePressed;
 			signal cruiseEnable/cruiseEnable;
+			signal speed/speed;
+			signal accel/accel;
+			signal cruiseSpeed/cruiseSpeed;
 			signal throttleCmd/throttleCmd;
 			signal cruiseState/cruiseState
 		]
