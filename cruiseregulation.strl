@@ -11,6 +11,8 @@ function regulateThrottle(boolean, float, float): float;
 	%Interface declarations
 	input on, off, resume, set;
 	input brakePressed;
+	input accelPressed;
+	input withinSpeedLimit;
 	input cruiseEnable;
 	input speed : float;
 	input accel : float;
@@ -26,10 +28,22 @@ function regulateThrottle(boolean, float, float): float;
 
 					if (state = 1) then 			% OFF
 						%%%% NEXT STATE LOGIC
+
+						present on and brakePressed then
+							state := 3;
+							exit T1;
+						end present;
+
+						present on and (accelPressed or not withinSpeedLimit) then
+							state := 4;
+							exit T1;
+						end present;
+
 						present on then
 							state := 2;
+							exit T1;
 						end present;
-					
+
 						exit T1;
 					end if;
 				
@@ -172,24 +186,30 @@ module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT
 	constant speedMax  = 150.0f  : float;
 	constant speedInc  = 2.5f    : float;
 		loop
-			% TODO: Likely need a pre here too
-			present (on or set) and withinSpeedLimit then 
-				sustain cruiseSpeed(?speed);
-			end present; 
-		
-			present quickAccel then 
-				if ((?speed + speedInc) < speedMax) then 
-					emit speed(?speed + speedInc);
-				end if;
-			end present; 
+			trap CT in
+				present (on or set) and withinSpeedLimit then 
+					emit cruiseSpeed(?speed);
+					exit CT;
+				end present;
 
-			present quickDeccel then 
-				if ((?speed - speedInc) > speedMin) then 
-					emit speed(?speed - speedInc);
-				end if;
-			end present;
+				present quickDeccel and (not (on or set)) then 
+					if ((?cruiseSpeed - speedInc) > speedMin) then 
+						emit cruiseSpeed(?cruiseSpeed - speedInc);
+					end if;
+					exit CT;
+				end present;
+
+				present quickAccel and (not (on or set))  then
+					if ((?cruiseSpeed + speedInc) < speedMax) then 
+						emit cruiseSpeed(?cruiseSpeed + speedInc);
+					end if;
+					exit CT;
+				end present;				
+				
+				emit cruiseSpeed(pre(?cruiseSpeed));
+			end trap;
 			%TODO: pause what we want here?
-			pause
+			pause;
 		end loop
 end module
 	
@@ -231,6 +251,8 @@ module cruiseControl:
 			signal off/off;
 			signal resume/resume;
 			signal brakePressed/brakePressed;
+			signal accelPressed/accelPressed;
+			signal withinSpeedLimit/withinSpeedLimit;
 			signal cruiseEnable/cruiseEnable;
 			signal speed/speed;
 			signal accel/accel;
