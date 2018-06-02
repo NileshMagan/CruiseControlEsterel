@@ -1,115 +1,104 @@
-module cruiseControl:
-
-
-function regulateThrottle(boolean, float, float): float;
-
-%interface declarations
-input on, off, resume, set, quickDeccel, quickAccel;
-input accel : float;
-input brake : float;
-input speed : float;
-
-output cruiseSpeed : float;
-output throttleCmd : float;
-output cruiseState := 1: integer;
-
-% CONSTANTS
-constant speedMin  = 30.0f   : float;
-constant speedMax  = 150.0f  : float;
-constant speedInc  = 2.5f    : float;
-constant pedalsMin = 3.0f    : float;
 
 % TODO: cruiseEnable
-% TODO brkaePressed signal
+% TODO brakePressed signal
 
-% TODO double check curiseEnable
+% TODO double check cruiseEnable
 % TODO may need to pre(brakePressed)
+% TODO check if defaulting inputs to 0 is bad
+module FSM:
+function regulateThrottle(boolean, float, float): float;
 
-signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in 
-	[
-	var state := 1 : integer in
-		loop
-			trap T1 in
-				pause; 		% TICK DEPENDANT 
-				if (state = 1) then 			% OFF
-				
-					%%%% NEXT STATE LOGIC
-					present on then
-						state := 2;
-					end present;
-				
-				
-					exit T1;
-				end if;
-			
-				if (state = 2) then			% ON
-			
-					%%%% NEXT STATE LOGIC
-					present off then
-						state := 1;
-						exit T1;
-					end present;
-					present brakePressed then
-						state := 3;
-						exit T1;
-					end present;
-					 present not(cruiseEnable) then
-						state := 4;
-						exit T1;
-					end present;
-				
-				
-				
-					exit T1;
-				end if;
-			
-				if (state = 4) then			% DISABLE
-			
-					%%%% NEXT STATE LOGIC
-					present off then
-						state := 1;
-						exit T1;
-					end present;
-					present cruiseEnable then
-						state := 2;
-						exit T1;
-					end present;
-				
-				
-					exit T1;
-				end if;
-			
-				if (state = 3) then			% STDBY
-			
-					%%%% NEXT STATE LOGIC
-					present off then
-						state := 1;
-						exit T1;
-					end present;
+
+
+
+	%Interface declarations
+	input on, off, resume, set;
+	input speed : float;
+	input brakePressed;
+	input cruiseEnable;
+
+	output throttleCmd : float;
+	output cruiseState : integer; 
+
+		var state := 1 : integer in
+			loop
+				trap T1 in
+					pause; 		% TICK DEPENDANT 
+
+					if (state = 1) then 			% OFF
+						%%%% NEXT STATE LOGIC
+						present on then
+							state := 2;
+						end present;
 					
-					present resume and cruiseEnable then
-						state := 2; 
 						exit T1;
-					end present;
-					present resume and not(cruiseEnable) then
-						state := 4;
-						exit T1;				
-					end present;
+					end if;
+				
+					if (state = 2) then			% ON
+						%%%% NEXT STATE LOGIC
+						present off then
+							state := 1;
+							exit T1;
+						end present;
+						present brakePressed then
+							state := 3;
+							exit T1;
+						end present;
+						present not(cruiseEnable) then
+							state := 4;
+							exit T1;
+						end present;
 					
-					exit T1;
-				end if;
-			end trap;
-			
-			%%%% OUTPUT LOGIC
-			emit cruiseState(state);
-		end loop		
-	end var
-	]
+						exit T1;
+					end if;
+							
+					if (state = 3) then			% STDBY
+						%%%% NEXT STATE LOGIC
+						present off then
+							state := 1;
+							exit T1;
+						end present;
+						
+						present resume and cruiseEnable then
+							state := 2; 
+							exit T1;
+						end present;
+						present resume and not(cruiseEnable) then
+							state := 4;
+							exit T1;				
+						end present;
+						
+						exit T1;
+					end if;
+
+					if (state = 4) then			% DISABLE
+						%%%% NEXT STATE LOGIC
+						present off then
+							state := 1;
+							exit T1;
+						end present;
+						present cruiseEnable then
+							state := 2;
+							exit T1;
+						end present;
+					
+						exit T1;
+					end if;
+
+				end trap;
+				
+				%%%% OUTPUT LOGIC
+				emit cruiseState(state);
+			end loop		
+		end var
+end module	
 	
+
+module brakeDetection: %%%%%%%% BRAKE PRESS DETECTION
+	input brake : float;
+	output brakePressed;
+	constant pedalsMin = 3.0f : float;
 	
-||
-	
-	[ %%%%%%%% BRAKE PRESS DETECTION
 		loop
 			% TODO check if this should be pre or not
 			await brake;
@@ -117,11 +106,13 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 				emit brakePressed
 			end if;
 		end loop
-	]
-	
-||
-	
-	[ %%%%%%%% ACCEL PRESS DETECTION
+end module
+
+
+module accelDetection: %%%%%%%% ACCEL PRESS DETECTION
+	input accel : float;
+	output accelPressed;
+	constant pedalsMin = 3.0f : float;
 		loop
 			% TODO check if this should be pre or not
 			await accel;
@@ -129,31 +120,42 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 				emit accelPressed
 			end if;
 		end loop
-	]
+end module
 
-|| 
-	[ %%%%%%%% CALC WITHIN SPEED LIMIT
+module speedLimitDetection: %%%%%%%% CALC WITHIN SPEED LIMIT
+	input speed : float;
+	output withinSpeedLimit;
+	constant speedMin  = 30.0f   : float;
+	constant speedMax  = 150.0f  : float;
 		loop 
 			if (?speed > speedMin) and (?speed < speedMax) then 
 				emit withinSpeedLimit
 			end if;
 			pause
 		end loop 
-	]
+end module
 	
-|| 
-	[ %%%%%%%% CALC CRUISE ENABLE
+
+module cruiseEnableDetection: %%%%%%%% CALC CRUISE ENABLE
+	input accelPressed, withinSpeedLimit;
+	output cruiseEnable;
 		loop 
 			%TODO, may need a pre here
 			present (not accelPressed) and withinSpeedLimit then 
 				emit cruiseEnable;
 			end present;
 			pause
-		end loop 
-	]
-	
-||
-	[ %%%%%%%% CRUISE SPEED MANAGEMENT 
+		end loop
+end module
+
+
+module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT 
+	input on, set, withinSpeedLimit, accelPressed, quickAccel, quickDeccel;
+	input speed : float;
+	output cruiseSpeed : float;
+	constant speedMin  = 30.0f   : float;
+	constant speedMax  = 150.0f  : float;
+	constant speedInc  = 2.5f    : float;
 		loop
 			% TODO: Likely need a pre here too
 			present (on or set) and withinSpeedLimit then 
@@ -176,7 +178,7 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 			%TODO: pause what we want here?
 			pause
 		end loop
-	]
+end module
 	
 %||
 %
@@ -198,10 +200,62 @@ signal brakePressed, accelPressed, cruiseEnable, withinSpeedLimit in
 %		end var
 %	]
 	
+module cruiseControl:
+	%interface declarations
+	input on, off, resume, set, quickDeccel, quickAccel;
+	input accel : float;
+	input brake : float;
+	input speed : float;
 
-	
-	
-end signal	
+	output cruiseSpeed : float;
+	output throttleCmd : float;
+	output cruiseState := 1: integer;
+
+
+	signal accelPressed, brakePressed, cruiseEnable, withinSpeedLimit in
+		run FSM[ 
+			signal on/on;
+			signal off/off;
+			signal resume/resume;
+			signal speed/speed;
+			signal brakePressed/brakePressed;
+			signal cruiseEnable/cruiseEnable;
+			signal throttleCmd/throttleCmd;
+			signal cruiseState/cruiseState
+		]
+		||
+		run brakeDetection[ 
+			signal brake/brake;
+			signal brakePressed/brakePressed
+		]
+		||
+		run accelDetection[ 
+			signal accel/accel;
+			signal accelPressed/accelPressed 
+		]
+		||
+		run speedLimitDetection[ 
+			signal speed/speed;
+			signal withinSpeedLimit/withinSpeedLimit 
+		]
+		||
+		run cruiseEnableDetection[ 
+			signal accelPressed/accelPressed;
+			signal withinSpeedLimit/withinSpeedLimit; 
+			signal cruiseEnable/cruiseEnable
+		]
+		||
+		run cruiseSpeedManagement[ 
+			signal on/on;
+			signal set/set;
+			signal withinSpeedLimit/withinSpeedLimit; 
+			signal accelPressed/accelPressed;
+			signal quickAccel/quickAccel;
+			signal quickDeccel/quickDeccel;
+			signal speed/speed;
+			signal cruiseSpeed/cruiseSpeed
+		]
+        end signal;
 end module
 
 

@@ -4,3 +4,4 @@
 cruiseregulation.c
 *.o
 *.exe
+*.vscode/
