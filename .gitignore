@@ -5,3 +5,6 @@ cruiseregulation.c
 *.o
 *.exe
 *.vscode/
+
+*.~vsdx
+#*.vsdx
