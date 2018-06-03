@@ -19,7 +19,7 @@ function regulateThrottle(boolean, float, float): float;
 	input cruiseSpeed : float;
 
 	output throttleCmd : float;
-	output cruiseState : integer; 
+	output cruiseState : string; 
 
 		var prevState := 1 : integer, state := 1 : integer in
 			loop
@@ -105,14 +105,21 @@ function regulateThrottle(boolean, float, float): float;
 				end trap;
 				
 				%%%% OUTPUT LOGIC
-				emit cruiseState(state);
-				if (state = 2) then
+				if (state = 1) then % If not in ON state, throttleCmd <= accel
+					emit cruiseState("OFF");
+					emit throttleCmd(?accel);
+				elsif (state = 2) then
+					emit cruiseState("ON");
 					if (prevState = 2) then
 						emit throttleCmd(regulateThrottle(false, ?cruiseSpeed, ?speed));
 					else
 						emit throttleCmd(regulateThrottle(true, ?cruiseSpeed, ?speed));
 					end if;
+				elsif (state = 3) then % If not in ON state, throttleCmd <= accel
+					emit cruiseState("STDBY");
+					emit throttleCmd(?accel);
 				else % If not in ON state, throttleCmd <= accel
+					emit cruiseState("DISABLE");
 					emit throttleCmd(?accel);
 				end if;
 
@@ -225,26 +232,7 @@ module cruiseSpeedManagement: %%%%%%%% CRUISE SPEED MANAGEMENT
 		end loop
 end module
 	
-%||
-%
-%	[ %%%%%%%% DRIVING CONTROL
-%		var currentThrottle := 0 : float in	
-%			loop 
-%				% TODO: may need pre here
-%				present (not off) then
-%					present (on) then 
-%						if (pre(not on)) then
-%							regulateThrottle(true, ?cruiseSpeed, ?speed);
-%						else
-%							regulateThrottle(false, ?cruiseSpeed, ?speed);
-%						end if;
-%					end present; 	
-%				end present;
-%				pause 
-%			end loop 
-%		end var
-%	]
-	
+
 module cruiseControl:
 	%interface declarations
 	input on, off, resume, set, quickDeccel, quickAccel;
@@ -254,7 +242,7 @@ module cruiseControl:
 
 	output cruiseSpeed := 0.0f : float;
 	output throttleCmd := 0.0f : float;
-	output cruiseState := 1: integer;
+	output cruiseState := "OFF": string;
 
 
 	signal accelPressed, brakePressed, cruiseEnable, withinSpeedLimit in
