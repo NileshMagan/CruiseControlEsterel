@@ -4,15 +4,21 @@
 
 This README is for a Cruise Controller written in Esterel. This is a submission for Assignment 2 of COMPSYS 723 at the University of Auckland, Semester 1 2018.
 
+
 Authors:
 - Nilesh Magan (UPI: nmag404)
 - Kathryn Jaggar (UPI: kjag214)
+
+
+This design requires the installation of Esterelv6
 
 
 The following files should be in the same directory as the README:
 - cruiseregulation.strl
 - cruiseregulation_data.c
 - cruiseregulation.h
+- esterelv6_01.run
+- Makefile
 - report_group_22.pdf
 
 

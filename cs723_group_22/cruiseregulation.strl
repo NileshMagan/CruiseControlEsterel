@@ -1,0 +1,292 @@
+
+% This module enulates the Finite State Machine used to control the system outputs
+
+module FSM:
+function regulateThrottle(boolean, float, float): float;
+	input on, off, resume, set;
+	input brakePressed;
+	input accelPressed;
+	input withinSpeedLimit;
+	input cruiseEnable;
+	input speed : float;
+	input accel : float;
+	input cruiseSpeed : float;
+	output throttleCmd : float;
+	output cruiseState : string; 
+
+		var prevState := 1 : integer, state := 1 : integer in
+			loop
+				trap T1 in
+					pause; 
+
+					if (state = 1) then 			% OFF STATE
+						%%%% NEXT STATE LOGIC
+
+						present on and brakePressed then
+							state := 3;
+							exit T1;
+						end present;
+
+						present on and (accelPressed or not withinSpeedLimit) then
+							state := 4;
+							exit T1;
+						end present;
+
+						present on then
+							state := 2;
+							exit T1;
+						end present;
+
+						exit T1;
+					end if;
+				
+					if (state = 2) then			% ON STATE
+						%%%% NEXT STATE LOGIC
+						present off then
+							state := 1;
+							exit T1;
+						end present;
+						present brakePressed then
+							state := 3;
+							exit T1;
+						end present;
+						present not(cruiseEnable) then
+							state := 4;
+							exit T1;
+						end present;
+					
+						exit T1;
+					end if;
+							
+					if (state = 3) then			% STDBY STATE
+						%%%% NEXT STATE LOGIC
+						present brakePressed then % Brake has highest priprity
+							exit T1;
+						end present;
+
+						present off then
+							state := 1;
+							exit T1;
+						end present;
+						
+						present resume and cruiseEnable then
+							state := 2; 
+							exit T1;
+						end present;
+						present resume and not(cruiseEnable) then
+							state := 4;
+							exit T1;				
+						end present;
+						
+						exit T1;
+					end if;
+
+					if (state = 4) then			% DISABLE STATE
+						%%%% NEXT STATE LOGIC
+						present off then
+							state := 1;
+							exit T1;
+						end present;
+						present cruiseEnable then
+							state := 2;
+							exit T1;
+						end present;
+					
+						exit T1;
+					end if;
+
+				end trap;
+				
+				%%%% OUTPUT LOGIC
+				if (state = 1) then % If not in ON state, throttleCmd <= accel
+					emit cruiseState("OFF");
+					emit throttleCmd(?accel);
+				elsif (state = 2) then
+					emit cruiseState("ON");
+					if (prevState = 2) then
+						emit throttleCmd(regulateThrottle(false, ?cruiseSpeed, ?speed));
+					else
+						emit throttleCmd(regulateThrottle(true, ?cruiseSpeed, ?speed));
+					end if;
+				elsif (state = 3) then % If not in ON state, throttleCmd <= accel
+					emit cruiseState("STDBY");
+					emit throttleCmd(?accel);
+				else % If not in ON state, throttleCmd <= accel
+					emit cruiseState("DISABLE");
+					emit throttleCmd(?accel);
+				end if;
+
+				prevState := state;
+
+			end loop		
+		end var
+end module	
+	
+
+% This module detects whether the break pedal has been pressed based on the signal value
+module brakeDetection: 
+	input brake : float;
+	output brakePressed;
+	constant pedalsMin = 3.0f : float;
+	
+		loop
+			if (?brake > pedalsMin) then
+				emit brakePressed
+			end if;
+			pause;
+		end loop
+end module
+
+% This module detects whether the accelerator pedal has been pressed based on the signal value
+module accelDetection: 
+	input accel : float;
+	output accelPressed;
+	constant pedalsMin = 3.0f : float;
+		loop
+			if (?accel > pedalsMin) then
+				emit accelPressed
+			end if;
+			pause;
+		end loop
+end module
+
+% This module calculates whether the currect speed input is within the defined limits
+module speedLimitDetection: 
+	input speed : float;
+	output withinSpeedLimit;
+	constant speedMin  = 30.0f   : float;
+	constant speedMax  = 150.0f  : float;
+		loop 
+			if (?speed > speedMin) and (?speed < speedMax) then 
+				emit withinSpeedLimit
+			end if;
+			pause
+		end loop 
+end module
+	
+% This module determines if the cruise should be enabled. 
+% This is based on whether the vehicle is within the speed limit and if the accelerator pedal is pressed.
+module cruiseEnableDetection: 
+	input accelPressed, withinSpeedLimit;
+	output cruiseEnable;
+		loop 
+			present (not accelPressed) and withinSpeedLimit then 
+				emit cruiseEnable;
+			end present;
+			pause
+		end loop
+end module
+
+% This module determines the value of the cruise speed. 
+% The cruise speed is set when the on or set button is pressed and updated with the quickAccel and quickDecel buttons.
+module cruiseSpeedManagement: 
+	input on, set, withinSpeedLimit, accelPressed, quickAccel, quickDeccel;
+	input speed : float;
+	output cruiseSpeed : float;
+	constant speedMin  = 30.0f   : float;
+	constant speedMax  = 150.0f  : float;
+	constant speedInc  = 2.5f    : float;
+		loop
+			trap CT in
+				present (on or set) then 
+					present withinSpeedLimit then
+						emit cruiseSpeed(?speed);
+					else
+						if ?speed < speedMin then 
+							emit cruiseSpeed(speedMin);
+						elsif ?speed > speedMax then 
+							emit cruiseSpeed(speedMax);
+						end if;
+					end present;
+					exit CT;
+				end present;
+
+				present quickDeccel and (not (on or set)) then 
+					if ((pre(?cruiseSpeed) - speedInc) > speedMin) then 
+						emit cruiseSpeed(pre(?cruiseSpeed) - speedInc);
+					else
+						emit cruiseSpeed(speedMin);
+					end if;
+					exit CT;
+				end present;
+
+				present quickAccel and (not (on or set))  then
+					if ((pre(?cruiseSpeed) + speedInc) < speedMax) then 
+						emit cruiseSpeed(pre(?cruiseSpeed) + speedInc);
+					else
+						emit cruiseSpeed(speedMax);
+					end if;
+					exit CT;
+				end present;				
+				
+				emit cruiseSpeed(pre(?cruiseSpeed));
+			end trap;
+			pause;
+		end loop
+end module	
+
+
+% TOP LEVEL MODULE 
+% Port mapping and running other modules in parallel
+module cruiseControl:
+	input on, off, resume, set, quickDeccel, quickAccel;
+	input accel := 0.0f : float;
+	input brake := 0.0f : float;
+	input speed := 0.0f : float;
+
+	output cruiseSpeed := 0.0f : float;
+	output throttleCmd := 0.0f : float;
+	output cruiseState := "OFF": string;
+
+
+	signal accelPressed, brakePressed, cruiseEnable, withinSpeedLimit in
+		run FSM[ 
+			signal on/on;
+			signal off/off;
+			signal resume/resume;
+			signal brakePressed/brakePressed;
+			signal accelPressed/accelPressed;
+			signal withinSpeedLimit/withinSpeedLimit;
+			signal cruiseEnable/cruiseEnable;
+			signal speed/speed;
+			signal accel/accel;
+			signal cruiseSpeed/cruiseSpeed;
+			signal throttleCmd/throttleCmd;
+			signal cruiseState/cruiseState
+		]
+		||
+		run brakeDetection[ 
+			signal brake/brake;
+			signal brakePressed/brakePressed
+		]
+		||
+		run accelDetection[ 
+			signal accel/accel;
+			signal accelPressed/accelPressed 
+		]
+		||
+		run speedLimitDetection[ 
+			signal speed/speed;
+			signal withinSpeedLimit/withinSpeedLimit 
+		]
+		||
+		run cruiseEnableDetection[ 
+			signal accelPressed/accelPressed;
+			signal withinSpeedLimit/withinSpeedLimit; 
+			signal cruiseEnable/cruiseEnable
+		]
+		||
+		run cruiseSpeedManagement[ 
+			signal on/on;
+			signal set/set;
+			signal withinSpeedLimit/withinSpeedLimit; 
+			signal accelPressed/accelPressed;
+			signal quickAccel/quickAccel;
+			signal quickDeccel/quickDeccel;
+			signal speed/speed;
+			signal cruiseSpeed/cruiseSpeed
+		]
+        end signal;
+end module
+
+
